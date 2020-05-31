@@ -55,6 +55,7 @@ fn to_route(
 fn to_path_filter(path: config::Path) -> warp::filters::BoxedFilter<()> {
     path.into_string()
         .split('/')
+        .map(str::trim)
         .filter(|p| !p.is_empty())
         .map(ToString::to_string)
         .fold(warp::any().boxed(), |filter, path| {
@@ -67,7 +68,14 @@ fn to_filter(path_action: config::PathAction) -> warp::filters::BoxedFilter<(Box
 
     match path_action.action {
         config::Action::ServePath(path) => {
-            filter.and(warp::fs::dir(path)).map(BoxedReply::new).boxed()
+            if path.is_dir() {
+                filter.and(warp::fs::dir(path)).map(BoxedReply::new).boxed()
+            } else {
+                filter
+                    .and(warp::fs::file(path))
+                    .map(BoxedReply::new)
+                    .boxed()
+            }
         }
         config::Action::Redirect(url) => filter
             .and(warp::path::end())
