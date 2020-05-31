@@ -94,12 +94,6 @@ fn to_filter(path_action: config::PathAction) -> warp::filters::BoxedFilter<(Box
 #[tokio::main]
 async fn main() {
     let options = config::Options::init();
-
-    if options.paths.is_empty() {
-        eprintln!("No routes provided");
-        std::process::exit(-1);
-    }
-
     print_options(&options);
 
     let (port, paths) = (options.port, options.paths);

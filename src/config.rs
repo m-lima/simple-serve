@@ -1,22 +1,22 @@
-use clap::Clap;
+use clap::{ArgGroup, Clap};
 
 #[derive(Clap, Debug)]
-#[clap(name = "Simple Server", about = "A simple multi-purpose server")]
+#[clap(name = "Simple Server", about = "A simple multi-purpose server", group = ArgGroup::with_name("routes").required(true))]
 struct RawOptions {
     /// Port that the the server should bind to
     #[clap(short, long, default_value = "3030")]
     port: u16,
 
     /// Serve from filesystem path
-    #[clap(short, long)]
+    #[clap(short, long, value_name = "path", group = "routes")]
     file: Vec<RawPathAction<std::path::PathBuf>>,
 
     /// Respond with a redirect
-    #[clap(short, long)]
+    #[clap(short, long, value_name = "URL", group = "routes")]
     redirect: Vec<RawPathAction<warp::http::Uri>>,
 
     /// Respond with status code
-    #[clap(short, long)]
+    #[clap(short, long, value_name = "status_code", group = "routes")]
     status: Vec<RawPathAction<warp::http::StatusCode>>,
 }
 
