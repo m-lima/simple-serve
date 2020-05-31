@@ -9,7 +9,7 @@ mod config;
 fn print_options(options: &config::Options) {
     println!("Launching on http://0.0.0.0:{}", options.port);
     for path_action in &options.paths {
-        println!("  /{} -> {}", path_action.path, path_action.action);
+        println!("  {} -> {}", path_action.path, path_action.action);
     }
 }
 
@@ -37,30 +37,47 @@ fn to_route(
     path_action
         .into_iter()
         .map(to_filter)
-        .fold(None, |routes, filter| {
-            if routes.is_none() {
-                Some(filter)
-            } else {
-                Some(routes.unwrap().or(filter).map(BoxedReply::new).boxed())
-            }
-        })
+        .fold(
+            Option::<warp::filters::BoxedFilter<(BoxedReply,)>>::None,
+            |routes, filter| {
+                if let Some(previous) = routes {
+                    Some(previous.or(filter).map(BoxedReply::new).boxed())
+                } else {
+                    Some(filter)
+                }
+            },
+        )
         .unwrap()
 }
 
+// Allowed because filter_map here is dumb
+#[allow(clippy::filter_map)]
+fn to_path_filter(path: config::Path) -> warp::filters::BoxedFilter<()> {
+    path.into_string()
+        .split('/')
+        .filter(|p| !p.is_empty())
+        .map(ToString::to_string)
+        .fold(warp::any().boxed(), |filter, path| {
+            filter.and(warp::path(path)).boxed()
+        })
+}
+
 fn to_filter(path_action: config::PathAction) -> warp::filters::BoxedFilter<(BoxedReply,)> {
-    let filter = warp::path(path_action.path);
+    let filter = to_path_filter(path_action.path);
 
     match path_action.action {
         config::Action::ServePath(path) => {
             filter.and(warp::fs::dir(path)).map(BoxedReply::new).boxed()
         }
         config::Action::Redirect(url) => filter
+            .and(warp::path::end())
             .map(move || warp::redirect(url.clone()))
             .map(BoxedReply::new)
             .boxed(),
         config::Action::StatusCode(status) => filter
+            .and(warp::path::end())
             .map(warp::reply)
-            .map(move |r| warp::reply::with_status(r, status.clone()))
+            .map(move |r| warp::reply::with_status(r, status))
             .map(BoxedReply::new)
             .boxed(),
     }
@@ -68,6 +85,8 @@ fn to_filter(path_action: config::PathAction) -> warp::filters::BoxedFilter<(Box
 
 #[tokio::main]
 async fn main() {
+    use std::iter::FromIterator;
+
     let path = std::env::args().nth(1).map_or_else(
         || {
             eprintln!("No path provided");
@@ -98,23 +117,28 @@ async fn main() {
             std::process::exit(-1);
         });
 
-    use std::iter::FromIterator;
     let options = config::Options {
         port,
         paths: std::collections::HashSet::from_iter(
             vec![
                 config::PathAction {
-                    path: String::from("bla"),
+                    path: config::Path::from("bla"),
                     action: config::Action::ServePath(path.clone()),
                 },
                 config::PathAction {
-                    path: String::from("ble"),
+                    path: config::Path::from("ble"),
                     action: config::Action::Redirect(warp::http::Uri::from_static(
                         "http://www.google.com",
                     )),
                 },
                 config::PathAction {
-                    path: String::from("bli"),
+                    path: config::Path::from("bli"),
+                    action: config::Action::StatusCode(
+                        warp::http::StatusCode::from_u16(550).unwrap(),
+                    ),
+                },
+                config::PathAction {
+                    path: config::Path::from("bli/bla"),
                     action: config::Action::StatusCode(
                         warp::http::StatusCode::from_u16(555).unwrap(),
                     ),
