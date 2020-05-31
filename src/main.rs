@@ -7,9 +7,9 @@ use warp::Filter;
 mod config;
 
 fn print_options(options: &config::Options) {
-    println!("Launching on http://0.0.0.0:{}", options.port);
-    for path_action in &options.paths {
-        println!("  {} -> {}", path_action.path, path_action.action);
+    println!("Launching on http://0.0.0.0:{}", options.port());
+    for route in options.routes() {
+        println!("  {} -> {}", route.path, route.action);
     }
 }
 
@@ -32,9 +32,9 @@ impl warp::Reply for BoxedReply {
 }
 
 fn to_route(
-    path_action: std::collections::HashSet<config::PathAction>,
+    route: std::collections::HashSet<config::Route>,
 ) -> warp::filters::BoxedFilter<(BoxedReply,)> {
-    path_action
+    route
         .into_iter()
         .map(to_filter)
         .fold(
@@ -63,10 +63,10 @@ fn to_path_filter(path: config::Path) -> warp::filters::BoxedFilter<()> {
         })
 }
 
-fn to_filter(path_action: config::PathAction) -> warp::filters::BoxedFilter<(BoxedReply,)> {
-    let filter = to_path_filter(path_action.path);
+fn to_filter(route: config::Route) -> warp::filters::BoxedFilter<(BoxedReply,)> {
+    let filter = to_path_filter(route.path);
 
-    match path_action.action {
+    match route.action {
         config::Action::ServePath(path) => {
             if path.is_dir() {
                 filter.and(warp::fs::dir(path)).map(BoxedReply::new).boxed()
@@ -96,8 +96,8 @@ async fn main() {
     let options = config::Options::init();
     print_options(&options);
 
-    let (port, paths) = (options.port, options.paths);
-    let routes = to_route(paths);
+    let (port, routes) = options.decompose();
+    let routes = to_route(routes);
 
     warp::serve(routes).run(([0, 0, 0, 0], port)).await;
 }

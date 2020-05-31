@@ -9,71 +9,86 @@ struct RawOptions {
 
     /// Serve from filesystem path
     #[clap(short, long, value_name = "path", group = "routes")]
-    file: Vec<RawPathAction<std::path::PathBuf>>,
+    file: Vec<RawRoute<std::path::PathBuf>>,
 
     /// Respond with a redirect
     #[clap(short, long, value_name = "URL", group = "routes")]
-    redirect: Vec<RawPathAction<warp::http::Uri>>,
+    redirect: Vec<RawRoute<warp::http::Uri>>,
 
     /// Respond with status code
     #[clap(short, long, value_name = "status_code", group = "routes")]
-    status: Vec<RawPathAction<warp::http::StatusCode>>,
+    status: Vec<RawRoute<warp::http::StatusCode>>,
 }
 
 pub struct Options {
-    pub port: u16,
-    pub paths: std::collections::HashSet<PathAction>,
+    port: u16,
+    routes: std::collections::HashSet<Route>,
 }
 
 impl Options {
     pub fn init() -> Self {
         let raw_options: RawOptions = RawOptions::parse();
-        let mut paths = std::collections::HashSet::with_capacity(
+        let mut routes = std::collections::HashSet::with_capacity(
             raw_options.file.len() + raw_options.redirect.len() + raw_options.status.len(),
         );
         raw_options
             .file
             .into_iter()
-            .map(RawPathAction::to_path_action)
+            .map(RawRoute::into_route)
             .for_each(|p| {
-                paths.insert(p);
+                routes.insert(p);
             });
         raw_options
             .redirect
             .into_iter()
-            .map(RawPathAction::to_path_action)
+            .map(RawRoute::into_route)
             .for_each(|p| {
-                paths.insert(p);
+                routes.insert(p);
             });
         raw_options
             .status
             .into_iter()
-            .map(RawPathAction::to_path_action)
+            .map(RawRoute::into_route)
             .for_each(|p| {
-                paths.insert(p);
+                routes.insert(p);
             });
         Self {
             port: raw_options.port,
-            paths,
+            routes,
         }
+    }
+
+    #[inline]
+    pub fn port(&self) -> u16 {
+        self.port
+    }
+
+    #[inline]
+    pub fn routes(&self) -> &std::collections::HashSet<Route> {
+        &self.routes
+    }
+
+    #[inline]
+    pub fn decompose(self) -> (u16, std::collections::HashSet<Route>) {
+        (self.port, self.routes)
     }
 }
 
 #[derive(Debug)]
-pub struct PathAction {
+pub struct Route {
     pub path: Path,
     pub action: Action,
 }
 
-impl std::cmp::Eq for PathAction {}
+impl std::cmp::Eq for Route {}
 
-impl std::cmp::PartialEq for PathAction {
+impl std::cmp::PartialEq for Route {
     fn eq(&self, other: &Self) -> bool {
         self.path == other.path
     }
 }
 
-impl std::hash::Hash for PathAction {
+impl std::hash::Hash for Route {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.path.hash(state)
     }
@@ -83,8 +98,8 @@ impl std::hash::Hash for PathAction {
 pub struct Path(String);
 
 impl Path {
-    pub fn from(path_string: &str) -> Self {
-        Self(path_string.to_lowercase())
+    pub fn from(path: &str) -> Self {
+        Self(path.to_lowercase())
     }
 
     #[inline]
@@ -123,7 +138,7 @@ impl std::fmt::Display for Action {
 }
 
 #[derive(Debug)]
-struct RawPathAction<A>
+struct RawRoute<A>
 where
     A: RawAction,
 {
@@ -131,19 +146,19 @@ where
     action: A,
 }
 
-impl<A> RawPathAction<A>
+impl<A> RawRoute<A>
 where
     A: RawAction,
 {
-    fn to_path_action(self) -> PathAction {
-        PathAction {
+    fn into_route(self) -> Route {
+        Route {
             path: self.path,
             action: self.action.to_action(),
         }
     }
 }
 
-impl<A> std::str::FromStr for RawPathAction<A>
+impl<A> std::str::FromStr for RawRoute<A>
 where
     A: RawAction,
 {
