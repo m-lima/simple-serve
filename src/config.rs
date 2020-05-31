@@ -4,8 +4,8 @@ use clap::{ArgGroup, Clap};
 #[clap(name = "Simple Server", about = "A simple multi-purpose server", group = ArgGroup::with_name("routes").required(true).multiple(true))]
 struct RawOptions {
     /// Port that the the server should bind to
-    #[clap(short, long, default_value = "3030")]
-    port: u16,
+    #[clap(short, long, default_value = "[::1]:3030")]
+    address: std::net::SocketAddr,
 
     /// Serve from filesystem path
     #[clap(short, long, value_name = "path", group = "routes")]
@@ -13,16 +13,16 @@ struct RawOptions {
 
     /// Respond with a redirect
     #[clap(short, long, value_name = "URL", group = "routes")]
-    redirect: Vec<RawRoute<warp::http::Uri>>,
+    redirect: Vec<RawRoute<hyper::http::Uri>>,
 
     /// Respond with status code
     #[clap(short, long, value_name = "status_code", group = "routes")]
-    status: Vec<RawRoute<warp::http::StatusCode>>,
+    status: Vec<RawRoute<hyper::http::StatusCode>>,
 }
 
 pub struct Options {
-    port: u16,
-    routes: Vec<Route>,
+    pub address: std::net::SocketAddr,
+    pub routes: Vec<Route>,
 }
 
 fn into_route_iter<A>(routes: Vec<RawRoute<A>>) -> impl Iterator<Item = Route>
@@ -39,7 +39,7 @@ impl Options {
             raw_options.file.len() + raw_options.redirect.len() + raw_options.status.len();
 
         Self {
-            port: raw_options.port,
+            address: raw_options.address,
             routes: into_route_iter(raw_options.status)
                 .chain(into_route_iter(raw_options.redirect))
                 .chain(into_route_iter(raw_options.file))
@@ -52,21 +52,6 @@ impl Options {
                     acc
                 }),
         }
-    }
-
-    #[inline]
-    pub fn port(&self) -> u16 {
-        self.port
-    }
-
-    #[inline]
-    pub fn routes(&self) -> &[Route] {
-        &self.routes
-    }
-
-    #[inline]
-    pub fn decompose(self) -> (u16, Vec<Route>) {
-        (self.port, self.routes)
     }
 }
 
@@ -91,11 +76,6 @@ impl Path {
     pub fn from(path: &str) -> Self {
         Self(path.to_lowercase())
     }
-
-    #[inline]
-    pub fn into_string(self) -> String {
-        self.0
-    }
 }
 
 impl std::convert::AsRef<str> for Path {
@@ -113,8 +93,8 @@ impl std::fmt::Display for Path {
 #[derive(Debug)]
 pub enum Action {
     ServePath(std::path::PathBuf),
-    Redirect(warp::http::Uri),
-    StatusCode(warp::http::StatusCode),
+    Redirect(hyper::http::Uri),
+    StatusCode(hyper::http::StatusCode),
 }
 
 impl std::fmt::Display for Action {
@@ -188,13 +168,13 @@ impl RawAction for std::path::PathBuf {
     }
 }
 
-impl RawAction for warp::http::Uri {
+impl RawAction for hyper::http::Uri {
     fn to_action(self) -> Action {
         Action::Redirect(self)
     }
 }
 
-impl RawAction for warp::http::StatusCode {
+impl RawAction for hyper::http::StatusCode {
     fn to_action(self) -> Action {
         Action::StatusCode(self)
     }
