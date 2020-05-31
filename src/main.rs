@@ -31,9 +31,7 @@ impl warp::Reply for BoxedReply {
     }
 }
 
-fn to_route(
-    route: std::collections::HashSet<config::Route>,
-) -> warp::filters::BoxedFilter<(BoxedReply,)> {
+fn to_route(route: Vec<config::Route>) -> warp::filters::BoxedFilter<(BoxedReply,)> {
     route
         .into_iter()
         .map(to_filter)

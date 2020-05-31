@@ -22,13 +22,13 @@ struct RawOptions {
 
 pub struct Options {
     port: u16,
-    routes: std::collections::HashSet<Route>,
+    routes: Vec<Route>,
 }
 
 impl Options {
     pub fn init() -> Self {
         let raw_options: RawOptions = RawOptions::parse();
-        let mut routes = std::collections::HashSet::with_capacity(
+        let mut routes = Vec::with_capacity(
             raw_options.file.len() + raw_options.redirect.len() + raw_options.status.len(),
         );
         raw_options
@@ -36,21 +36,33 @@ impl Options {
             .into_iter()
             .map(RawRoute::into_route)
             .for_each(|p| {
-                routes.insert(p);
+                if !routes.contains(&p) {
+                    routes.push(p);
+                } else {
+                    eprintln!("Ignoring repeated path: {}", p.path);
+                }
             });
         raw_options
             .redirect
             .into_iter()
             .map(RawRoute::into_route)
             .for_each(|p| {
-                routes.insert(p);
+                if !routes.contains(&p) {
+                    routes.push(p);
+                } else {
+                    eprintln!("Ignoring repeated path: {}", p.path);
+                }
             });
         raw_options
             .status
             .into_iter()
             .map(RawRoute::into_route)
             .for_each(|p| {
-                routes.insert(p);
+                if !routes.contains(&p) {
+                    routes.push(p);
+                } else {
+                    eprintln!("Ignoring repeated path: {}", p.path);
+                }
             });
         Self {
             port: raw_options.port,
@@ -64,12 +76,12 @@ impl Options {
     }
 
     #[inline]
-    pub fn routes(&self) -> &std::collections::HashSet<Route> {
+    pub fn routes(&self) -> &[Route] {
         &self.routes
     }
 
     #[inline]
-    pub fn decompose(self) -> (u16, std::collections::HashSet<Route>) {
+    pub fn decompose(self) -> (u16, Vec<Route>) {
         (self.port, self.routes)
     }
 }
@@ -88,13 +100,7 @@ impl std::cmp::PartialEq for Route {
     }
 }
 
-impl std::hash::Hash for Route {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.path.hash(state)
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Hash)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Path(String);
 
 impl Path {
