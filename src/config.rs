@@ -35,24 +35,22 @@ where
 impl Options {
     pub fn init() -> Self {
         let raw_options: RawOptions = RawOptions::parse();
-        let mut routes = Vec::with_capacity(
-            raw_options.file.len() + raw_options.redirect.len() + raw_options.status.len(),
-        );
-
-        into_route_iter(raw_options.status)
-            .chain(into_route_iter(raw_options.redirect))
-            .chain(into_route_iter(raw_options.file))
-            .for_each(|p| {
-                if routes.contains(&p) {
-                    eprintln!("Ignoring repeated path: {} -> {}", p.path, p.action);
-                } else {
-                    routes.push(p);
-                }
-            });
+        let max_size =
+            raw_options.file.len() + raw_options.redirect.len() + raw_options.status.len();
 
         Self {
             port: raw_options.port,
-            routes,
+            routes: into_route_iter(raw_options.status)
+                .chain(into_route_iter(raw_options.redirect))
+                .chain(into_route_iter(raw_options.file))
+                .fold(Vec::with_capacity(max_size), |mut acc, curr| {
+                    if acc.contains(&curr) {
+                        eprintln!("Ignoring repeated path: {} -> {}", curr.path, curr.action);
+                    } else {
+                        acc.push(curr);
+                    }
+                    acc
+                }),
         }
     }
 
