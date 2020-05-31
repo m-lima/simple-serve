@@ -25,45 +25,31 @@ pub struct Options {
     routes: Vec<Route>,
 }
 
+fn into_route_iter<A>(routes: Vec<RawRoute<A>>) -> impl Iterator<Item = Route>
+where
+    A: RawAction,
+{
+    routes.into_iter().map(RawRoute::into_route)
+}
+
 impl Options {
     pub fn init() -> Self {
         let raw_options: RawOptions = RawOptions::parse();
         let mut routes = Vec::with_capacity(
             raw_options.file.len() + raw_options.redirect.len() + raw_options.status.len(),
         );
-        raw_options
-            .file
-            .into_iter()
-            .map(RawRoute::into_route)
+
+        into_route_iter(raw_options.status)
+            .chain(into_route_iter(raw_options.redirect))
+            .chain(into_route_iter(raw_options.file))
             .for_each(|p| {
-                if !routes.contains(&p) {
-                    routes.push(p);
+                if routes.contains(&p) {
+                    eprintln!("Ignoring repeated path: {} -> {}", p.path, p.action);
                 } else {
-                    eprintln!("Ignoring repeated path: {}", p.path);
+                    routes.push(p);
                 }
             });
-        raw_options
-            .redirect
-            .into_iter()
-            .map(RawRoute::into_route)
-            .for_each(|p| {
-                if !routes.contains(&p) {
-                    routes.push(p);
-                } else {
-                    eprintln!("Ignoring repeated path: {}", p.path);
-                }
-            });
-        raw_options
-            .status
-            .into_iter()
-            .map(RawRoute::into_route)
-            .for_each(|p| {
-                if !routes.contains(&p) {
-                    routes.push(p);
-                } else {
-                    eprintln!("Ignoring repeated path: {}", p.path);
-                }
-            });
+
         Self {
             port: raw_options.port,
             routes,
