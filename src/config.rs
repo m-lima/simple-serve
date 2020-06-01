@@ -1,7 +1,7 @@
 use clap::{ArgGroup, Clap};
 
 #[derive(Clap, Debug)]
-#[clap(name = "Simple Server", about = "A simple multi-purpose server", group = ArgGroup::with_name("routes").required(true).multiple(true))]
+#[clap(name = "Simple Serve", about = "A simple multi-purpose server", group = ArgGroup::with_name("routes").required(true).multiple(true))]
 struct RawOptions {
     /// Port that the the server should bind to
     #[clap(short, long, default_value = "[::1]:3030")]
