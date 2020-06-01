@@ -25,9 +25,9 @@ pub struct Options {
     pub routes: Vec<Route>,
 }
 
-fn into_route_iter<A>(routes: Vec<RawRoute<A>>) -> impl Iterator<Item=Route>
-    where
-        A: RawAction,
+fn into_route_iter<A>(routes: Vec<RawRoute<A>>) -> impl Iterator<Item = Route>
+where
+    A: RawAction,
 {
     routes.into_iter().map(RawRoute::into_route)
 }
@@ -48,7 +48,9 @@ impl Options {
                         Ok(_) => {
                             eprintln!("Ignoring repeated path: {} -> {}", curr.path, curr.action);
                         }
-                        Err(pos) => { acc.insert(pos, curr); }
+                        Err(pos) => {
+                            acc.insert(pos, curr);
+                        }
                     }
                     acc
                 }),
@@ -61,6 +63,25 @@ pub struct Route {
     pub path: String,
     pub method: Option<hyper::Method>,
     pub action: Action,
+}
+
+impl Route {
+    pub fn compare(&self, path: &str, method: Option<&hyper::Method>) -> std::cmp::Ordering {
+        match self.path.as_str().cmp(path) {
+            std::cmp::Ordering::Equal => {
+                if let Some(self_method) = &self.method {
+                    if let Some(other_method) = method {
+                        self_method.as_str().cmp(other_method.as_str())
+                    } else {
+                        std::cmp::Ordering::Equal
+                    }
+                } else {
+                    std::cmp::Ordering::Equal
+                }
+            }
+            o => o,
+        }
+    }
 }
 
 impl std::cmp::Eq for Route {}
@@ -79,24 +100,7 @@ impl std::cmp::PartialOrd for Route {
 
 impl std::cmp::Ord for Route {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
-        match self.path.cmp(&other.path) {
-            std::cmp::Ordering::Equal => {
-                if let Some(method) = &self.method {
-                    if let Some(other_method) = &other.method {
-                        method.as_str().cmp(other_method.as_str())
-                    } else {
-                        std::cmp::Ordering::Greater
-                    }
-                } else {
-                    if other.method.is_some() {
-                        std::cmp::Ordering::Less
-                    } else {
-                        std::cmp::Ordering::Equal
-                    }
-                }
-            },
-            o => o,
-        }
+        self.compare(&other.path, other.method.as_ref())
     }
 }
 
@@ -119,28 +123,29 @@ impl std::fmt::Display for Action {
 
 #[derive(Debug)]
 struct RawRoute<A>
-    where
-        A: RawAction,
+where
+    A: RawAction,
 {
     path: String,
     action: A,
 }
 
 impl<A> RawRoute<A>
-    where
-        A: RawAction,
+where
+    A: RawAction,
 {
     fn into_route(self) -> Route {
         Route {
             path: self.path,
             action: self.action.to_action(),
+            method: None,
         }
     }
 }
 
 impl<A> std::str::FromStr for RawRoute<A>
-    where
-        A: RawAction,
+where
+    A: RawAction,
 {
     type Err = ArgError;
 
@@ -149,12 +154,14 @@ impl<A> std::str::FromStr for RawRoute<A>
             .find(':')
             .map(|index| (String::from(&string[..index]), &string[index + 1..]))
             .ok_or(ArgError::Format)?;
+        let path = if parts.0.starts_with('/') {
+            parts.0
+        } else {
+            format!("/{}", parts.0)
+        };
         let action = A::from_str(parts.1).map_err(|_| ArgError::Convert)?;
         if action.valid() {
-            Ok(Self {
-                path: parts.0,
-                action,
-            })
+            Ok(Self { path, action })
         } else {
             Err(ArgError::Invalid(parts.1.to_string()))
         }
