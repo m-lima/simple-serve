@@ -104,7 +104,7 @@ impl std::cmp::Ord for Route {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Action {
     ServePath(std::path::PathBuf),
     Redirect(hyper::http::Uri),
