@@ -12,3 +12,7 @@ hyper = "0.13"
 #lazy_static = "1"
 #regex = "1"
 tokio = { version = "0.2", features = ["full"] }
+tokio-util = "0.3"
+
+[profile.release]
+lto = true

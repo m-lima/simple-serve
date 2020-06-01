@@ -106,6 +106,7 @@ impl std::cmp::Ord for Route {
 
 #[derive(Debug, Clone)]
 pub enum Action {
+    ServeFile(std::path::PathBuf),
     ServePath(std::path::PathBuf),
     Redirect(hyper::http::Uri),
     StatusCode(hyper::http::StatusCode),
@@ -114,7 +115,8 @@ pub enum Action {
 impl std::fmt::Display for Action {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Action::ServePath(path) => write!(fmt, "Serving {}", path.display()),
+            Action::ServeFile(path) => write!(fmt, "Serving file {}", path.display()),
+            Action::ServePath(path) => write!(fmt, "Serving path {}", path.display()),
             Action::Redirect(uri) => write!(fmt, "Redirecting to {}", uri),
             Action::StatusCode(status) => write!(fmt, "Responding {}", status),
         }
@@ -177,7 +179,11 @@ trait RawAction: std::str::FromStr {
 
 impl RawAction for std::path::PathBuf {
     fn to_action(self) -> Action {
-        Action::ServePath(self)
+        if self.is_dir() {
+            Action::ServePath(self)
+        } else {
+            Action::ServeFile(self)
+        }
     }
 
     fn valid(&self) -> bool {
