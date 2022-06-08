@@ -1,7 +1,5 @@
-use clap::{ArgGroup, Clap};
-
-#[derive(Clap, Debug)]
-#[clap(name = "Simple Serve", about = "A simple multi-purpose server", group = ArgGroup::with_name("routes").required(true).multiple(true))]
+#[derive(clap::Parser, Debug)]
+#[clap(name = "Simple Serve", about = "A simple multi-purpose server", group = clap::ArgGroup::new("routes").required(true).multiple(true))]
 struct RawOptions {
     /// Port that the the server should bind to
     #[clap(short, long, default_value = "3030")]
@@ -34,7 +32,7 @@ where
 
 impl Options {
     pub fn init() -> Self {
-        let raw_options: RawOptions = RawOptions::parse();
+        let raw_options: RawOptions = clap::Parser::parse();
         let max_size =
             raw_options.file.len() + raw_options.redirect.len() + raw_options.status.len();
 

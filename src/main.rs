@@ -1,6 +1,4 @@
-#![deny(warnings)]
-#![deny(clippy::pedantic)]
-#![warn(rust_2018_idioms)]
+#![deny(warnings, clippy::pedantic, rust_2018_idioms)]
 
 use warp::Filter;
 
@@ -48,8 +46,6 @@ fn to_route(route: Vec<config::Route>) -> warp::filters::BoxedFilter<(BoxedReply
         .unwrap()
 }
 
-// Allowed because filter_map here is dumb
-#[allow(clippy::filter_map)]
 fn to_path_filter(path: config::Path) -> warp::filters::BoxedFilter<()> {
     path.into_string()
         .split('/')
